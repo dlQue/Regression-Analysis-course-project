@@ -1,0 +1,468 @@
+---
+title: ""
+output: 
+  pdf_document: 
+    toc: no
+    fig_width: 4
+    fig_height: 3.5
+    fig_caption: yes
+    number_sections: yes
+urlcolor: blue  
+fontsize: 12pt
+# geometry: "left = 2.5cm, right = 2.5cm, top = 2cm, bottom = 2cm"
+header-includes:
+  - \usepackage{float}
+  - \usepackage{sectsty}
+  - \usepackage{paralist}
+  - \usepackage{setspace}\spacing{1.5}
+  - \usepackage{fancyhdr}
+  - \usepackage{lastpage}
+  - \usepackage{dcolumn}
+  - \usepackage{natbib}\bibliographystyle{agsm}
+  - \usepackage[nottoc, numbib]{tocbibind}
+bibliography: STAC67.bib
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+<!-- Cover Page -->
+
+```{=html}
+<!--The title is informative, specific and precise. It gives an accurate preview
+of what the report is about. The name and student number of all authors are 
+given with assigned job description.-->
+```
+```{=tex}
+\pagenumbering{gobble}
+\allsectionsfont{\centering}
+\subsectionfont{\raggedright}
+\subsubsectionfont{\raggedright}
+```
+````{=tex}
+\pagenumbering{gobble}
+\begin{centering}
+\vspace{2cm}
+```{r uni_logo, echo=F, out.width="50%"}
+knitr::include_graphics("UofT-Sc-logo.svg.png")
+```
+\vspace{1cm}
+
+\Large
+{\bf University of Toronto Scarborough}
+
+\vspace{1cm}
+\doublespacing
+{\bf STAC67 Case Study: Data Set 2 \\
+Factors Affecting Systolic Blood Pressure (SBP)}
+
+\vspace{0.5 cm}
+\normalsize
+\singlespacing
+By Group 12
+
+\vspace{1 cm}
+{\bf \large Donglin Que\normalsize(1006741233): \normalfont Format report, Background and significance, Result, Discussion, Conclusion and References}
+
+\vspace{0.3 cm}
+{\bf \large Yichen Bao\normalsize(1005773254): \normalfont Data cleaning, Model building, diagnostics and selection}
+
+\vspace{0.3 cm}
+{\bf \large Yifan Cui\normalsize(1006227995): \normalfont Model diagnostics, Result, Model validation and explanation}
+
+\vspace{0.3 cm}
+{\bf \large Yuxin Zhang\normalsize(1006747004): \normalfont Background and significance, Discussion}
+
+\vspace{2 cm}
+Last compiled on `r format(Sys.time(), '%B %d, %Y')`
+
+\end{centering}
+````
+
+\newpage
+
+<!-- contents -->
+
+```{=latex}
+\setcounter{tocdepth}{4}
+\hypersetup{linkcolor=black}
+\tableofcontents
+```
+\pagenumbering{arabic}
+
+\newpage
+
+# Background and Significance
+
+<!--This section has a logical organization and moves from general to specific. It provides sufficient background to understand the goal and content of the report. It has a clear explanation of why this work is important and relevant. The last few sentences of this section clearly present the goal of the study.-->
+
+Diastolic blood pressure was once considered the most important component of blood pressure and the main target of antihypertensive therapy.
+However, important epidemiological studies over the decades have pointed to the importance of systolic blood pressure (SBP)[@cdcHighBloodPressure2021].
+Unlike diastolic blood pressure, systolic blood pressure increases gradually with age and is the most common form of hypertension in aging societies.
+If the characteristic changes in systolic and diastolic blood pressure with age lead to elevated pulse pressure, the greater your risk of other health problems, such as heart disease, heart attack, and stroke [@strandbergWhatMostImportant2003a].
+
+In a 1990 study, the Cardiovascular Health Study recruited and examined 5,888 people aged 65 and over and followed them for seven years.
+After adjusting for potential confounders, the study found that systolic blood pressure is a better predictor of cardiovascular events than diastolic blood pressure, which is important data for studying cardiovascular events[@psatyAssociationBloodPressure2001a].
+
+This project aims to find out the factors that affect SBP by studying the blood pressure data of populations and to find the possible causes of high blood pressure statistically.
+It has a good warning effect on the prevention of high blood pressure.
+This study is based on data samples provided by UTSC.
+The data sample contains 18 variables for 500 observations.
+First, we use correlation to judge whether every two variables are related, and select uncorrelated factors from 18 variables for research.
+After cleaning the data, we built a linear regression model to show a linear relationship between the response variable SBP and the manipulated variable.
+Finally, we use stepwise selection based on AIC values to select the best model involving the following variables: '***Exercise***', '***Age***', '***Alcohol***', '***Treatment***', '***BMI***' and '***Smoking***'.
+
+# Exploratory data analysis
+
+## Data cleaning
+
+<!-- load packages -->
+
+```{r setup, include=FALSE}
+# load packages
+library(knitr)
+library(readxl)
+library(tidyverse)
+library(ggcorrplot)
+library(ggplot2)
+
+opts_chunk$set(echo = FALSE)
+
+# loading data
+data <- read_excel("BloodPressure.xlsx")
+```
+
+This data set include 500 observations, the response variable is SBP and there are 18 related variables.
+After loading data, we mutate data and build the correlation matrix as Figure 1.
+
+```{r, include=FALSE, echo = TRUE}
+# mutate data
+data %>% 
+  mutate(male = ifelse(gender == "M", 1, 0)) %>% 
+  mutate(marry = ifelse(married == "Y", 1, 0)) %>% 
+  mutate(smoker = ifelse(smoke == "Y", 1, 0)) %>% 
+  select(-gender, -married, -smoke) -> data
+# build correlation matrix
+round(cor(data),3)
+# correlation matrix visualization
+corr <- round(cor(data),3)
+p.mat <- cor_pmat(data)
+
+ggcorrplot(corr, hc.order = TRUE, type = "lower",
+     outline.col = "white")
+```
+
+<!--Then we visualize the correlation matrix.-->
+
+```{r, fig.width = 5.4, fig.height = 3.6, fig.cap = "Correlation matrix of all variables.", echo=FALSE}
+ggcorrplot(corr, hc.order = TRUE, type = "lower",
+   p.mat = p.mat)
+```
+
+```{r}
+# remove data have high correlation
+data %>% 
+  select(-height,-weight, -overwt) -> data
+```
+
+## Collinearity check
+
+In the first stage we test the correlationship between each variable and we delete those variables who have a highly correlationship.
+For example, the correlation between '***weight***' and '***overwt***' is 0.717, which is really high.
+If both variables are involved in the model, the model may suffer from multicollinearity.
+The significance for both variables will drop.
+We choose to remove '***'height***', '***weight***' and '***overwt***' in our model, because they can be represented by '***bmi***'.
+This is proved by the correlation matrix as well.
+Therefore, there is no need to involve all these four variables in the model.
+
+Base on the full model, some of the p-values are bigger than 0.05,which is not significant, such that they will not effect to our response variable.
+Therefore, we keep these variables are significant and should be involved in the model and remove the rest from the model to improve the overall significance.
+
+# Model
+
+<!--The data is described clearly and graphics are appropriately used and summarized with text. This section is concise but detailed enough so that the reader who does not have a deep knowledge of the data can read the following sections.-->
+
+```{=html}
+<!--The criteria and procedures applied for model selection and model validation are clearly described. The selected model is presented. The section explains the procedure applied from the lecture materials or beyond.
+Figures and tables are appropriately used and discussed-->
+```
+## Model building
+
+We first build our model as \tiny
+
+```{r, include=TRUE, echo = TRUE}
+# build full model
+full_model <- lm(sbp ~ factor(exercise) + age + factor(race) + factor(alcohol) + factor(trt) + bmi + factor(stress) + factor(salt) +
+                   factor(chldbear) + factor(income) + factor(educatn) + factor(male) + factor(marry) + factor(smoker), data)
+```
+
+\normalsize
+
+The summary of our model is \tiny
+
+```{r, include=TRUE}
+library(jtools)
+summ(full_model, model.info = FALSE)
+```
+
+\normalsize
+
+But there is still too much variables and we need to do the model selection.
+
+## Model selection
+
+We use the stepwise selection based on AIC value
+
+```{r, include=FALSE, echo = FALSE}
+fm <- step(full_model)
+library(MASS)
+```
+
+\scriptsize
+
+| variable |  step1 |   step2 |   step3 |   step4 |  step5 |  step6 |   step7 |   step8 |
+|:---------|-------:|--------:|--------:|--------:|-------:|-------:|--------:|--------:|
+| male     |     \- |      \- |      \- |      \- |     \- |     \- |      \- |      \- |
+| race     |        |      \- |      \- |      \- |     \- |     \- |      \- |      \- |
+| educatn  |        |         |      \- |      \- |     \- |     \- |      \- |      \- |
+| salt     |        |         |         |      \- |     \- |     \- |      \- |      \- |
+| chldbear |        |         |         |         |     \- |     \- |      \- |      \- |
+| income   |        |         |         |         |        |     \- |      \- |      \- |
+| marry    |        |         |         |         |        |        |      \- |      \- |
+| stress   |        |         |         |         |        |        |         |      \- |
+| exercise |        |         |         |         |        |        |         |         |
+| alcohol  |        |         |         |         |        |        |         |         |
+| smoker   |        |         |         |         |        |        |         |         |
+| trt      |        |         |         |         |        |        |         |         |
+| bmi      |        |         |         |         |        |        |         |         |
+| age      |        |         |         |         |        |        |         |         |
+| **AIC**  | 3256.6 | 3252.34 | 3248.35 | 3244.98 | 3243.4 | 3242.6 | 3242.16 | 3241.55 |
+
+\normalsize
+
+After the stepwise selection, our final model involves these variables '***exercise***', '***age***', '***alcohol***', '***trt***', '***bmi***', and '***smoker***'.
+Which is shown below.
+\scriptsize 
+
+```{r}
+summ(fm)
+```
+
+\normalsize
+
+## Model diagnostics
+
+\scriptsize
+
+```{r model with age, include=FALSE, echo = FALSE}
+Final_model <- lm(sbp ~ factor(exercise) + age + factor(alcohol) + 
+    factor(trt) + bmi + factor(smoker), data = data)
+summary(Final_model)
+```
+
+\normalsize
+
+Since the p value for '***age***' is still insignificant.
+Therefore, we try to remove this variable from the model and regress again.
+
+\tiny
+
+```{r model without age, include=FALSE, echo = FALSE}
+Final_model <- lm(sbp ~ factor(exercise) + factor(alcohol) + factor(trt) + bmi + factor(smoker), data = data)
+summary(Final_model)
+library(huxtable)
+```
+
+```{r, fig.width = 4, fig.height = 3, fig.cap = "Histogram of data$SBP", echo = FALSE}
+#tinytex::install_tinytex()
+#huxtable::install_latex_dependencies()
+#tinytex::tlmgr_install("unicode-math")
+Final_model1 <- lm(sbp ~ factor(exercise) + age + factor(alcohol) + 
+    factor(trt) + bmi + factor(smoker), data = data)
+
+Final_model2 <- lm(sbp ~ factor(exercise) + factor(alcohol) + factor(trt) + bmi + factor(smoker), data = data)
+
+huxreg(Final_model1, Final_model2)
+```
+
+\normalsize
+
+Comparing the two model with and without age in Page 13, we found that even though the $p$ value shows that '***age***' is insignificant, but when it is removed, the adjusted R square drops, which means that we should not remove it.
+The same as '***alcohol***'.
+We can see that alcohol2 is not significant in our model but for the part of highly usage of alcohol (alcohol3) is significant, so that we cannot drop the whole variable.
+In conclusion, our final model is:
+
+\tiny
+
+```{r}
+# this is our final model
+Final_model <- lm(sbp ~ factor(exercise) + age + factor(alcohol) + 
+    factor(trt) + bmi + factor(smoker), data = data)
+summary(Final_model)
+```
+
+# Result
+
+\normalsize
+
+For the distribution of response variable SBP, there is a approximately normal distribution, but with a slightly left-skewed(Fig. 2).
+
+```{r, fig.width = 4, fig.height = 3, fig.cap = "Histogram of data SBP", echo=FALSE}
+hist(data$sbp, main = "Histogram of SBP")
+```
+
+```{r, include=FALSE}
+# Residual plot
+plot(Final_model$fitted.values, Final_model$residuals)
+abline(h = 0)
+qqnorm(Final_model$residuals);qqline(Final_model$residuals)
+```
+
+\tiny
+
+```{r, fig.width = 4.8, fig.height = 3.2, fig.cap = "boxcox, lamba = 0.51", echo=FALSE}
+boxcox(Final_model)
+```
+
+```{r, fig.width = 6, fig.height = 4.5, fig.cap = "normal QQ plot", echo=FALSE}
+par(mfrow=c(2,2))
+plot(Final_model)
+```
+
+\normalsize
+
+By the normal QQ plot of residuals, we can see that in Fig.
+4, most of the points are NOT follow the QQ lines.
+There is a concern of non-normal assumption.
+By the figure of residuals vs fitted, there is a concern of non-constant variance (slightly tramper shape), also the red line is not parallel to x-axis.
+So we transfer to boxcox (Fig. 3).
+
+\normalsize
+
+```{r, include=FALSE, echo = FALSE}
+lamba <- boxcox(Final_model)$x[which.max(boxcox(Final_model)$y)]
+```
+
+```{r, fig.width = 6, fig.height = 4.5, fig.cap = "normal QQ plot"}
+## We get the current lamba is about 0.51
+k2 = log(sum(log(data$sbp))/500)
+k1 = 1/(lamba*k2^(lamba-1))
+w = k1 * (data$sbp^lamba-1)
+new_model = lm( w ~ factor(exercise) + age + factor(alcohol) + 
+    factor(trt) + bmi + factor(smoker), data = data)
+
+par(mfrow=c(2,2))
+plot(new_model)
+```
+
+After transformation, the residual plot looks better and satisfy the constant variance assumption, but by the new QQ plot (Fig. 5), it may exists some outliers and few plots are not follow the qqline, such that it failed normality assumption.
+
+\tiny
+
+```{r, echo = TRUE}
+p = length(Final_model$coefficients)
+n = nrow(data)
+d = qf(0.5,p,n-p)
+DFFITTS = dffits(Final_model)
+which(DFFITTS > 1)
+D = cooks.distance(Final_model)
+which(D > d)
+DFBETA = dfbetas(Final_model)
+which(DFBETA > 1)
+```
+
+\normalsize
+
+Check:
+
+-   $|DFFITS| > 2 \times \sqrt{\frac{p}{n}}$
+
+-   $|DFBETA| > \frac{2}{\sqrt{n}}$ 3.
+    $D_i < 10_{th}$to $20_{th}$ percentile
+
+There is no influential points
+
+\tiny
+
+```{r, echo = TRUE}
+crit = qt(1-0.05/(2*n), n-p-1)
+which(abs(rstudent(Final_model)) > crit)
+```
+
+\normalsize
+
+There is no outliers.
+
+\tiny
+
+```{r, echo = TRUE}
+which(hatvalues(Final_model) > 2*p/n)
+```
+
+\normalsize
+
+Check: $hatvaule >\frac{2p}{n}$ There is a leverage point.
+
+# Discussion
+
+<!--In this section, you restate the goal of the study and summarize your key finding. You also clearly explain how your findings may impact the field and present the limitations of your findings and possible areas for future research-->
+
+After getting the final model through stepwise AIC, the p-value of '***age***' in the summary table is still very low, which probably shows that '***age***' is insignificant.
+But when we remove '***age***', the $R^2$ of the model decreases from 0.193 to 0.189 (Page 13).
+In this regard, we believe that the variable '***age***' should not be removed from the model, not only because the fitting degree decreases in statistics, but also in reality, SBP will increase with age[@chrysantAggressiveSystolicBlood2018].For example, our model in Figure 6 shows that SBP increases with age and unhealthy living habits.
+
+```{r, include=FALSE, echo = FALSE}
+library(gridExtra)
+```
+
+```{r,fig.width = 6, fig.height = 4.5, fig.cap = "Comparison of SBP to related factors. How does alcohol, bmi, smoke and execrise effect on SBP"}
+alc <- ggplot(data = data,
+       mapping = aes(x = age, y = sbp, color = alcohol)) +
+  geom_line() +
+  facet_grid(rows = vars(alcohol)) +
+  theme_bw()
+
+exe <- ggplot(data = data,
+       mapping = aes(x = age, y = sbp, color = exercise)) +
+  geom_line() +
+  facet_grid(rows = vars(exercise)) +
+  theme_bw()
+
+bmi <- ggplot(data = data,
+       mapping = aes(x = age, y = sbp, color = trt)) +
+  geom_line() +
+  facet_grid(rows = vars(trt)) +
+  theme_bw()
+
+smo <- ggplot(data = data,
+       mapping = aes(x = age, y = sbp, color = smoker)) +
+  geom_line() +
+  facet_grid(rows = vars(smoker)) +
+  theme_bw()
+
+grid.arrange(alc, exe, bmi, smo, ncol=2, nrow =2)
+```
+
+The survey is not comprehensive enough in terms of data collection.
+The database only provided blood pressure data for people aged 18-64, however high blood pressure is not unique to this age group.
+In addition, the Sample data size is too small to find the provenance, with an average of only 10 samples per age.
+We can draw more precise conclusions with more samples.
+
+In reality, target SBP below 120 mmHg is associated with lower cardiovascular events and mortality[@okinRelationshipAllcauseMortality2018].
+CDC also states that unhealthy lifestyle choices such as not getting enough regular physical activity, and alcohol and nicotine intake can all lead to elevated SBP.
+Another non-randomized epidemiological study suggested that lower SBP may be associated with higher mortality in the very old[@ravindrarajahSystolicBloodPressure2017].
+Therefore, in addition to our uncontrollable age, living a healthy life and exercising more, staying away from tobacco and alcohol will greatly reduce our risk of high blood pressure and have a longer life[@bundySystolicBloodPressure2017].
+
+# Conclusion
+
+In this case study, we focus on the factors that affect systolic blood pressure.
+We first use '***BMI***' to represent '***'Height***', '***Weight***' and '***Overwt***' through the strength of correlation among 18 variables, which simplifies the difficulty of the model.
+Then we used stepwise AIC to remove variables with low correlation to the model.
+Finally, our test of the model also proves the validity of our model, which is consistent with the general situation of reality.
+Our final model contains '***Exercise***', '***Age***', '***Alcohol***', '***Treatment***', '***BMI*** ', and '***Smoke***', which means that exercise, age, alcohol consumption, targeted therapy, BMI, and smoking all have a large impact on SBP.
+
+\newpage
+
+# Reference
+
+\small
